@@ -1,4 +1,4 @@
-export type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'JPY' | 'CAD' | 'AUD' | 'CHF';
+export type CurrencyCode = string;
 
 export type ConversionResult = {
 	from: CurrencyCode;
@@ -9,36 +9,74 @@ export type ConversionResult = {
 	updatedAt: Date;
 };
 
-const MOCK_RATES: Record<CurrencyCode, number> = {
-	USD: 1,
-	EUR: 0.91,
-	GBP: 0.78,
-	JPY: 147.2,
-	CAD: 1.33,
-	AUD: 1.52,
-	CHF: 0.86
+type LatestResponse = {
+	result: 'success' | 'error';
+	conversion_rates?: Record<CurrencyCode, number>;
+	error?: string;
 };
 
+type PairResponse = {
+	result: 'success' | 'error';
+	conversion_rate?: number;
+	error?: string;
+};
+
+const API_BASE = '/api/rates';
+
 export class CurrencyService {
-	private currencies: CurrencyCode[] = Object.keys(MOCK_RATES) as CurrencyCode[];
+	private currencies: CurrencyCode[] = [];
+	private pairCache = new Map<string, number>();
+
+	async loadCurrencies(base: CurrencyCode = 'USD'): Promise<CurrencyCode[]> {
+		const res = await fetch(`${API_BASE}/latest?base=${encodeURIComponent(base)}`);
+		if (!res.ok) {
+			throw new Error('Failed to load currencies');
+		}
+		const data = (await res.json()) as LatestResponse;
+
+		if (data.result !== 'success' || !data.conversion_rates) {
+			throw new Error(data.error ?? 'Failed to load currencies');
+		}
+
+		this.currencies = Object.keys(data.conversion_rates);
+		return this.currencies;
+	}
 
 	getCurrencies(): CurrencyCode[] {
 		return this.currencies;
 	}
 
-	async convert(amount: number, from: CurrencyCode, to: CurrencyCode): Promise<ConversionResult> {
-		const fromRate = MOCK_RATES[from];
-		const toRate = MOCK_RATES[to];
+	private cacheKey(from: CurrencyCode, to: CurrencyCode): string {
+		return `${from}->${to}`;
+	}
 
-		const usdValue = amount / fromRate;
-		const converted = usdValue * toRate;
+	async convert(amount: number, from: CurrencyCode, to: CurrencyCode): Promise<ConversionResult> {
+		const key = this.cacheKey(from, to);
+		let rate = this.pairCache.get(key);
+
+		if (rate === undefined) {
+			const res = await fetch(
+				`${API_BASE}/pair?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+			);
+			if (!res.ok) {
+				throw new Error('Failed to fetch pair conversion');
+			}
+			const data = (await res.json()) as PairResponse;
+
+			if (data.result !== 'success' || data.conversion_rate === undefined) {
+				throw new Error(data.error ?? 'Failed to fetch pair conversion');
+			}
+
+			rate = data.conversion_rate;
+			this.pairCache.set(key, rate);
+		}
 
 		return {
 			from,
 			to,
-			rate: toRate / fromRate,
+			rate,
 			amount,
-			converted,
+			converted: amount * rate,
 			updatedAt: new Date()
 		};
 	}

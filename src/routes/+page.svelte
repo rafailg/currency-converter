@@ -11,12 +11,23 @@
 		amount: string;
 		status: PairStatus;
 		result: ConversionResult | null;
+		error?: string;
 	};
 
-	const currencies = currencyService.getCurrencies();
+	let currencies: CurrencyCode[] = [];
+	let currencyStatus: 'loading' | 'ready' | 'error' = 'loading';
+	let currencyError = '';
 	let pairs: PairState[] = [];
 
-	onMount(() => {
+	onMount(async () => {
+		try {
+			currencies = await currencyService.loadCurrencies('USD');
+			currencyStatus = 'ready';
+		} catch (error) {
+			currencyStatus = 'error';
+			currencyError = error instanceof Error ? error.message : 'Failed to load currencies';
+		}
+
 		if (!pairs.length) {
 			addPair();
 		}
@@ -59,25 +70,40 @@
 		const isReady = pair.from && pair.to && !Number.isNaN(amount) && amount > 0;
 
 		if (!isReady) {
-			pairs = pairs.map((p) => (p.id === id ? { ...p, status: 'idle', result: null } : p));
+			pairs = pairs.map((p) => (p.id === id ? { ...p, status: 'idle', result: null, error: '' } : p));
 			return;
 		}
 
-		pairs = pairs.map((p) => (p.id === id ? { ...p, status: 'pending' } : p));
+		pairs = pairs.map((p) => (p.id === id ? { ...p, status: 'pending', error: '' } : p));
 
-		const result = await currencyService.convert(amount, pair.from!, pair.to!);
+		try {
+			const result = await currencyService.convert(amount, pair.from!, pair.to!);
 
-		if (!pairs.some((p) => p.id === id)) return;
+			if (!pairs.some((p) => p.id === id)) return;
 
-		pairs = pairs.map((p) =>
-			p.id === id
-				? {
-					...p,
-					status: 'ready',
-					result
-				}
-				: p
-		);
+			pairs = pairs.map((p) =>
+				p.id === id
+					? {
+						...p,
+						status: 'ready',
+						result,
+						error: ''
+					}
+					: p
+			);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Failed to convert currency';
+			pairs = pairs.map((p) =>
+				p.id === id
+					? {
+						...p,
+						status: 'idle',
+						result: null,
+						error: message
+					}
+					: p
+			);
+		}
 	}
 
 	const currencyFormatter = new Intl.NumberFormat('en-US', {
@@ -99,7 +125,22 @@
 			<h1 class="text-4xl font-bold">Currency converter</h1>
 			<p class="text-base text-base-content/70">Add, configure, and monitor multiple exchange pairs side by side.</p>
 		</div>
+		<div class="badge badge-primary badge-outline badge-lg">Live rates via ExchangeRate-API</div>
 	</header>
+
+	{#if currencyStatus === 'loading'}
+		<div class="alert shadow mb-4">
+			<span class="loading loading-spinner loading-sm"></span>
+			<span>Loading currencies…</span>
+		</div>
+	{:else if currencyStatus === 'error'}
+		<div class="alert alert-error shadow mb-4">
+			<div>
+				<h3 class="font-semibold">Unable to load currencies</h3>
+				<p class="text-sm">{currencyError}</p>
+			</div>
+		</div>
+	{/if}
 
 	<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 		{#each pairs as pair, index}
@@ -127,8 +168,11 @@
 					<div class="grid grid-cols-2 gap-3">
 						<label class="form-control">
 							<div class="label"><span class="label-text">From</span></div>
-							<select class="select select-bordered w-full" on:change={(event) => handleSelect(pair.id, 'from', event)}>
-								<option value="" selected={!pair.from}>Pick currency</option>
+							<select
+								class="select select-bordered w-full"
+								on:change={(event) => handleSelect(pair.id, 'from', event)}
+								disabled={currencyStatus !== 'ready'}
+							>
 								{#each currencies as currency}
 									<option value={currency} selected={pair.from === currency}>{currency}</option>
 								{/each}
@@ -137,8 +181,11 @@
 
 						<label class="form-control">
 							<div class="label"><span class="label-text">To</span></div>
-							<select class="select select-bordered w-full" on:change={(event) => handleSelect(pair.id, 'to', event)}>
-								<option value="" selected={!pair.to}>Pick currency</option>
+							<select
+								class="select select-bordered w-full"
+								on:change={(event) => handleSelect(pair.id, 'to', event)}
+								disabled={currencyStatus !== 'ready'}
+							>
 								{#each currencies as currency}
 									<option value={currency} selected={pair.to === currency}>{currency}</option>
 								{/each}
@@ -181,6 +228,9 @@
 							<p class="font-medium">Complete the setup</p>
 							<p class="text-sm">Pick both currencies and enter an amount to see the conversion.</p>
 						</div>
+							{#if pair.error}
+								<p class="text-xs text-error mt-2">{pair.error}</p>
+							{/if}
 					{/if}
 				</div>
 			</div>
