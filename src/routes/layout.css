@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+@plugin 'daisyui';
+
+body {
+	@apply bg-base-200 text-base-content font-sans min-h-screen;
+}
