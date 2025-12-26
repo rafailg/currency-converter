@@ -22,12 +22,39 @@ type PairResponse = {
 };
 
 const API_BASE = '/api/rates';
+const CACHE_STORAGE_KEY = 'cc-rate-cache-v1';
 
 export class CurrencyService {
 	private currencies: CurrencyCode[] = [];
 	private pairCache = new Map<string, number>();
+	private cacheLoaded = false;
+
+	private ensureCacheLoaded() {
+		if (this.cacheLoaded) return;
+		if (typeof localStorage === 'undefined') return;
+		this.cacheLoaded = true;
+		const raw = localStorage.getItem(CACHE_STORAGE_KEY);
+		if (!raw) return;
+		try {
+			const parsed = JSON.parse(raw) as Record<string, number>;
+			Object.entries(parsed).forEach(([key, value]) => {
+				if (typeof value === 'number' && Number.isFinite(value)) {
+					this.pairCache.set(key, value);
+				}
+			});
+		} catch (error) {
+			console.warn('Failed to read cached rates from storage', error);
+		}
+	}
+
+	private persistCache() {
+		if (typeof localStorage === 'undefined') return;
+		const entries = Object.fromEntries(this.pairCache.entries());
+		localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(entries));
+	}
 
 	async loadCurrencies(base: CurrencyCode = 'USD'): Promise<CurrencyCode[]> {
+		this.ensureCacheLoaded();
 		const res = await fetch(`${API_BASE}/latest?base=${encodeURIComponent(base)}`);
 		if (!res.ok) {
 			throw new Error('Failed to load currencies');
@@ -51,6 +78,7 @@ export class CurrencyService {
 	}
 
 	async convert(amount: number, from: CurrencyCode, to: CurrencyCode): Promise<ConversionResult> {
+		this.ensureCacheLoaded();
 		const key = this.cacheKey(from, to);
 		let rate = this.pairCache.get(key);
 
@@ -69,6 +97,7 @@ export class CurrencyService {
 
 			rate = data.conversion_rate;
 			this.pairCache.set(key, rate);
+			this.persistCache();
 		}
 
 		return {

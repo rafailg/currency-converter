@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 	import { currencyService, type ConversionResult, type CurrencyCode } from '$lib';
 
@@ -14,51 +15,113 @@
 		error?: string;
 	};
 
+	const PAIRS_STORAGE_KEY = 'cc-pairs-v1';
+
+	function persistPairs(next: PairState[]) {
+		if (!browser) return;
+		const skinny = next.map(({ id, from, to, amount }) => ({ id, from, to, amount }));
+		localStorage.setItem(PAIRS_STORAGE_KEY, JSON.stringify(skinny));
+	}
+
+	function loadSavedPairs(): PairState[] {
+		if (!browser) return [];
+		const raw = localStorage.getItem(PAIRS_STORAGE_KEY);
+		if (!raw) return [];
+		try {
+			const parsed = JSON.parse(raw) as Array<{
+				id?: string;
+				from?: CurrencyCode;
+				to?: CurrencyCode;
+				amount?: string;
+			}>;
+			return parsed.map((item) => ({
+				id: item.id ?? crypto.randomUUID(),
+				from: item.from,
+				to: item.to,
+				amount: item.amount ?? '',
+				status: 'idle' as PairStatus,
+				result: null,
+				error: ''
+			}));
+		} catch (error) {
+			console.warn('Failed to read saved pairs', error);
+			return [];
+		}
+	}
+
 	let currencies: CurrencyCode[] = [];
 	let currencyStatus: 'loading' | 'ready' | 'error' = 'loading';
 	let currencyError = '';
 	let pairs: PairState[] = [];
 
 	onMount(async () => {
+		pairs = loadSavedPairs();
+		if (!pairs.length) {
+			addPair(false);
+		}
+
 		try {
 			currencies = await currencyService.loadCurrencies('USD');
 			currencyStatus = 'ready';
+			applyDefaultsIfMissing('USD');
 		} catch (error) {
 			currencyStatus = 'error';
 			currencyError = error instanceof Error ? error.message : 'Failed to load currencies';
 		}
-
-		if (!pairs.length) {
-			addPair();
-		}
 	});
 
-	function addPair() {
-		pairs = [
-			...pairs,
-			{
-				id: crypto.randomUUID(),
-				amount: '',
-				status: 'idle',
-				result: null
-			}
-		];
+	function applyDefaultsIfMissing(base: CurrencyCode = 'USD') {
+		if (!currencies.length) return;
+		const defaultFrom = currencies.includes(base) ? base : currencies[0];
+		const defaultTo = currencies.find((c) => c !== defaultFrom) ?? currencies[0];
+		const next = pairs.map((pair) => ({
+			...pair,
+			from: pair.from ?? defaultFrom,
+			to: pair.to ?? defaultTo
+		}));
+		setPairs(next, false);
+	}
+
+	function setPairs(next: PairState[], persist = true) {
+		pairs = next;
+		if (persist) persistPairs(next);
+	}
+
+	function addPair(arg?: boolean | Event) {
+		const shouldPersist = typeof arg === 'boolean' ? arg : true;
+		const defaultFrom = currencies[0];
+		const defaultTo = currencies.find((c) => c !== defaultFrom);
+		setPairs(
+			[
+				...pairs,
+				{
+					id: crypto.randomUUID(),
+					amount: '',
+					from: defaultFrom,
+					to: defaultTo,
+					status: 'idle',
+					result: null,
+					error: ''
+				}
+			],
+			shouldPersist
+		);
 	}
 
 	function removePair(id: string) {
-		pairs = pairs.filter((pair) => pair.id !== id);
+		setPairs(pairs.filter((pair) => pair.id !== id));
 	}
 
 	function handleSelect(id: string, key: 'from' | 'to', event: Event) {
 		const value = (event.target as HTMLSelectElement).value as CurrencyCode | '';
 		const updates = { [key]: value || undefined } as Partial<PairState>;
-		pairs = pairs.map((pair) => (pair.id === id ? { ...pair, ...updates } : pair));
+		setPairs(pairs.map((pair) => (pair.id === id ? { ...pair, ...updates } : pair)));
 		void refreshResult(id);
 	}
 
 	function handleAmountInput(id: string, event: Event) {
 		const value = (event.target as HTMLInputElement).value;
-		pairs = pairs.map((pair) => (pair.id === id ? { ...pair, amount: value } : pair));
+		setPairs(pairs.map((pair) => (pair.id === id ? { ...pair, amount: value } : pair)));
 		void refreshResult(id);
 	}
 
