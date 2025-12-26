@@ -179,6 +179,17 @@
 		minute: '2-digit',
 		second: '2-digit'
 	});
+
+	function invalidateCache() {
+		currencyService.clearCache();
+		const next: PairState[] = pairs.map((pair): PairState => ({
+			...pair,
+			status: 'idle',
+			result: null,
+			error: ''
+		}));
+		setPairs(next);
+	}
 </script>
 
 <section class="max-w-6xl mx-auto px-4">
@@ -188,7 +199,9 @@
 			<h1 class="text-4xl font-bold">Currency converter</h1>
 			<p class="text-base text-base-content/70">Add, configure, and monitor multiple exchange pairs side by side.</p>
 		</div>
-		<div class="badge badge-primary badge-outline badge-lg">Live rates via ExchangeRate-API</div>
+		<button type="button" class="btn btn-outline btn-primary" on:click={invalidateCache}>
+			Invalidate rate cache
+		</button>
 	</header>
 
 	{#if currencyStatus === 'loading'}
@@ -207,7 +220,7 @@
 
 	<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 		{#each pairs as pair, index}
-			<div class="card bg-base-100 border border-base-300 shadow-xl relative min-h-[260px]">
+			<div class="card bg-base-100 border border-base-300 shadow-xl relative min-h-65">
 				<button
 					type="button"
 					class="btn btn-ghost btn-sm absolute right-3 top-3"
@@ -302,7 +315,7 @@
 		<button
 			type="button"
 			on:click={addPair}
-			class="card bg-base-100 border-2 border-dashed border-base-300 hover:border-primary/70 hover:shadow-xl transition duration-150 min-h-[260px] items-center justify-center text-primary"
+			class="card bg-base-100 border-2 border-dashed border-base-300 hover:border-primary/70 hover:shadow-xl transition duration-150 min-h-65 items-center justify-center text-primary"
 			aria-label="Add currency pair"
 		>
 			<div class="card-body items-center justify-center text-center space-y-2">

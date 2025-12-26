@@ -53,6 +53,14 @@ export class CurrencyService {
 		localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(entries));
 	}
 
+	clearCache() {
+		this.pairCache.clear();
+		this.cacheLoaded = true;
+		if (typeof localStorage !== 'undefined') {
+			localStorage.removeItem(CACHE_STORAGE_KEY);
+		}
+	}
+
 	async loadCurrencies(base: CurrencyCode = 'USD'): Promise<CurrencyCode[]> {
 		this.ensureCacheLoaded();
 		const res = await fetch(`${API_BASE}/latest?base=${encodeURIComponent(base)}`);
