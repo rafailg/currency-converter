@@ -99,7 +99,6 @@
 			<h1 class="text-4xl font-bold">Currency converter</h1>
 			<p class="text-base text-base-content/70">Add, configure, and monitor multiple exchange pairs side by side.</p>
 		</div>
-		<div class="badge badge-primary badge-outline badge-lg">Mock data only</div>
 	</header>
 
 	<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -119,7 +118,6 @@
 				<div class="card-body space-y-4">
 					<div class="flex items-center justify-between">
 						<div>
-							<p class="text-xs uppercase tracking-wide text-base-content/60">Pair {index + 1}</p>
 							<h3 class="text-lg font-semibold">
 								{pair.from ?? '—'} / {pair.to ?? '—'}
 							</h3>
@@ -147,7 +145,6 @@
 							</select>
 						</label>
 					</div>
-
 					<label class="form-control">
 						<div class="label flex items-center justify-between">
 							<span class="label-text">Amount</span>
@@ -196,13 +193,14 @@
 			aria-label="Add currency pair"
 		>
 			<div class="card-body items-center justify-center text-center space-y-2">
-				<div class="btn btn-circle btn-outline btn-primary">
-					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
-						<path d="M12.75 5.75a.75.75 0 0 0-1.5 0v5.5h-5.5a.75.75 0 0 0 0 1.5h5.5v5.5a.75.75 0 0 0 1.5 0v-5.5h5.5a.75.75 0 0 0 0-1.5h-5.5z" />
-					</svg>
-				</div>
-				<p class="font-semibold text-base-content">Add currency pair</p>
-				<p class="text-sm text-base-content/70">Track another conversion at a glance.</p>
+				<div>
+                    <div class="btn btn-circle btn-outline btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                            <path d="M12.75 5.75a.75.75 0 0 0-1.5 0v5.5h-5.5a.75.75 0 0 0 0 1.5h5.5v5.5a.75.75 0 0 0 1.5 0v-5.5h5.5a.75.75 0 0 0 0-1.5h-5.5z" />
+                        </svg>
+                    </div>
+                    <p class="font-semibold text-base-content mt-2">Add currency pair</p>
+                </div>
 			</div>
 		</button>
 	</div>
