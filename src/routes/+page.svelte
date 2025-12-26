@@ -49,6 +49,11 @@
 		}
 	}
 
+	function isPairReady(pair: PairState): boolean {
+		const amount = Number(pair.amount);
+		return Boolean(pair.from && pair.to && !Number.isNaN(amount) && amount > 0);
+	}
+
 	let currencies: CurrencyCode[] = [];
 	let currencyStatus: 'loading' | 'ready' | 'error' = 'loading';
 	let currencyError = '';
@@ -64,6 +69,7 @@
 			currencies = await currencyService.loadCurrencies('USD');
 			currencyStatus = 'ready';
 			applyDefaultsIfMissing('USD');
+			refreshReadyPairs();
 		} catch (error) {
 			currencyStatus = 'error';
 			currencyError = error instanceof Error ? error.message : 'Failed to load currencies';
@@ -180,6 +186,14 @@
 		second: '2-digit'
 	});
 
+	function refreshReadyPairs() {
+		pairs.forEach((pair) => {
+			if (isPairReady(pair)) {
+				void refreshResult(pair.id);
+			}
+		});
+	}
+
 	function invalidateCache() {
 		currencyService.clearCache();
 		const next: PairState[] = pairs.map((pair): PairState => ({
@@ -189,6 +203,7 @@
 			error: ''
 		}));
 		setPairs(next);
+		refreshReadyPairs();
 	}
 </script>
 
